@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Single Fraction Visualizer</title>
+<style>
+  :root{
+    --ink:#222;
+    --bg:#fff;
+    --ghost:#8d98a3;
+    --error:#b3261e;
+    --fill:#8fb8de;
+    --empty:#f3f4f6;
+    --panel:#ffffff;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+
+  body{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  #app{
+    width:100vw;
+    height:100vh;
+    padding:2vh 3vw;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:1.4vh;
+  }
+
+  #fractionLabel{
+    font-family:"STIX Two Math","Cambria Math","Times New Roman",serif;
+    font-size:clamp(60px,7vw,118px);
+    line-height:.88;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    min-width:1.25em;
+    user-select:none;
+    color:var(--fill);
+    transition:transform .16s ease,color .16s ease;
+  }
+
+  #fractionLabel .bar{
+    width:100%;
+    min-width:1.05em;
+    height:.055em;
+    background:currentColor;
+    margin:.08em 0 .09em;
+    border-radius:99px;
+  }
+
+  #fractionLabel.bump{ transform:scale(1.06); }
+  #fractionLabel.error{ color:var(--error) !important; }
+
+  #modeCaption{
+    font-size:clamp(14px,1.5vw,18px);
+    color:#666;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    user-select:none;
+    margin-top:-.4vh;
+  }
+
+  #visualArea{
+    width:min(92vw,1200px);
+    min-height:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:18px;
+  }
+
+  .circleModel{
+    width:min(27vw,260px);
+    height:min(27vw,260px);
+    min-width:150px;
+    min-height:150px;
+  }
+
+  .circleModel svg, .barModel svg{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  .barModel{
+    width:min(72vw,780px);
+    height:min(16vh,120px);
+    min-width:240px;
+    min-height:52px;
+  }
+
+  #toast{
+    position:fixed;
+    bottom:1.5vh;
+    left:50%;
+    transform:translateX(-50%);
+    color:var(--ghost);
+    font-size:clamp(15px,1.4vw,22px);
+    opacity:0;
+    transition:opacity .18s ease;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  #toast.show{ opacity:1; }
+
+  #startOverlay,#helpOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(255,255,255,.97);
+    z-index:20;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px;
+  }
+  #helpOverlay{ display:none; }
+
+  .panel{
+    width:min(860px,94vw);
+    text-align:center;
+  }
+
+  .panel h1{
+    font-size:clamp(32px,5vw,60px);
+    margin:0 0 24px;
+  }
+
+  .panel p{
+    font-size:clamp(17px,2vw,23px);
+    line-height:1.45;
+    color:#555;
+    margin:12px 0;
+  }
+
+  .startInputs{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    margin:18px 0 20px;
+    flex-wrap:wrap;
+  }
+
+  .startInputs input,.startInputs select{
+    border:4px solid var(--ink);
+    border-radius:10px;
+    outline:none;
+    background:#fff;
+    text-align:center;
+    font-family:"STIX Two Math","Cambria Math","Times New Roman",serif;
+  }
+
+  .startInputs input{
+    width:min(250px,34vw);
+    font-size:clamp(34px,5vw,66px);
+    padding:10px 12px;
+  }
+
+  .startInputs select{
+    width:min(230px,42vw);
+    font-size:clamp(26px,3.2vw,38px);
+    padding:10px 12px;
+  }
+
+  .keys{
+    margin:22px auto 0;
+    width:min(760px,92vw);
+    display:grid;
+    grid-template-columns:1fr 1.5fr;
+    gap:11px 24px;
+    text-align:left;
+    font-size:clamp(16px,1.7vw,21px);
+    color:#444;
+  }
+
+  .keys b{ color:var(--ink); }
+
+  .tiny{
+    margin-top:22px !important;
+    font-size:clamp(14px,1.3vw,18px) !important;
+    color:#777 !important;
+  }
+
+  @media (max-width:900px){
+    .circleModel{ width:min(34vw,220px); height:min(34vw,220px); }
+    .barModel{ width:min(82vw,560px); }
+  }
+
+  @media (max-height:740px){
+    #app{ padding-top:1.2vh; gap:1vh; }
+    #fractionLabel{ font-size:clamp(48px,7vh,78px); }
+    .circleModel{ width:min(24vh,190px); height:min(24vh,190px); }
+    .barModel{ height:min(14vh,100px); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="fractionLabel">
+    <div id="fracNum">3</div><div class="bar"></div><div id="fracDen">4</div>
+  </div>
+  <div id="modeCaption">Circle slices</div>
+  <div id="visualArea"></div>
+  <div id="toast"></div>
+</div>
+
+<div id="startOverlay">
+  <div class="panel">
+    <h1>Single Fraction Visualizer</h1>
+    <p>Enter one fraction and choose how to visualize it.</p>
+    <div class="startInputs">
+      <input id="fractionInput" value="7/4" autocomplete="off" spellcheck="false">
+      <select id="modeInput" aria-label="visualization mode">
+        <option value="circle">Circle slices</option>
+        <option value="bars">Fraction bars</option>
+      </select>
+    </div>
+    <p><b>Enter</b> to begin</p>
+    <p class="tiny">Supports improper fractions. Press <b>?</b> for controls.</p>
+  </div>
+</div>
+
+<div id="helpOverlay">
+  <div class="panel">
+    <h1>Controls</h1>
+    <div class="keys">
+      <div><b>2–9</b></div><div>multiply the fraction by n/n</div>
+      <div><b>Shift + 2–9</b></div><div>divide the fraction by n/n when possible</div>
+      <div><b>V</b></div><div>toggle between circle slices and fraction bars</div>
+      <div><b>C</b></div><div>switch to circle slices</div>
+      <div><b>B</b></div><div>switch to fraction bars</div>
+      <div><b>Z</b></div><div>undo the last change</div>
+      <div><b>R</b></div><div>reset to the starting fraction</div>
+      <div><b>F</b></div><div>choose a new fraction</div>
+      <div><b>?</b> or <b>Esc</b></div><div>close this help</div>
+    </div>
+    <p class="tiny">Example: tap <b>3</b> to turn 1/2 into 3/6. Tap <b>Shift + 3</b> to turn 3/6 back into 1/2.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const $ = id => document.getElementById(id);
+
+  const fracNumEl = $('fracNum');
+  const fracDenEl = $('fracDen');
+  const fractionLabel = $('fractionLabel');
+  const modeCaption = $('modeCaption');
+  const visualArea = $('visualArea');
+  const toast = $('toast');
+
+  const startOverlay = $('startOverlay');
+  const helpOverlay = $('helpOverlay');
+  const fractionInput = $('fractionInput');
+  const modeInput = $('modeInput');
+
+  let state = newFraction(7,4);
+  let viewMode = 'circle';
+  let history = [];
+  let toastTimer = null;
+
+  function newFraction(n=1,d=2){
+    return { startNum:n, startDen:d, num:n, den:d };
+  }
+
+  function copyState(s){
+    return { startNum:s.startNum, startDen:s.startDen, num:s.num, den:s.den };
+  }
+
+  function snapshot(){
+    return { state:copyState(state), viewMode };
+  }
+
+  function restore(snap){
+    state = copyState(snap.state);
+    viewMode = snap.viewMode;
+    renderAll();
+  }
+
+  function parseFraction(text){
+    const m = text.trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+    if(!m) return null;
+    const n = Number(m[1]);
+    const d = Number(m[2]);
+    if(!Number.isInteger(n) || !Number.isInteger(d) || d <= 0 || n < 0) return null;
+    return {n,d};
+  }
+
+  function showToast(msg,error=false){
+    toast.textContent = msg;
+    toast.style.color = error ? 'var(--error)' : 'var(--ghost)';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 950);
+  }
+
+  function bump(error=false){
+    fractionLabel.classList.remove('bump','error');
+    void fractionLabel.offsetWidth;
+    fractionLabel.classList.add('bump');
+    if(error) fractionLabel.classList.add('error');
+    setTimeout(() => fractionLabel.classList.remove('bump','error'), 220);
+  }
+
+  function createSvgEl(name, attrs={}){
+    const el = document.createElementNS(SVG_NS, name);
+    for(const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
+  }
+
+  function polar(cx,cy,r,deg){
+    const rad = (deg-90) * Math.PI / 180;
+    return { x: cx + r*Math.cos(rad), y: cy + r*Math.sin(rad) };
+  }
+
+  function sectorPath(cx,cy,r,startDeg,endDeg){
+    const start = polar(cx,cy,r,startDeg);
+    const end = polar(cx,cy,r,endDeg);
+    const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+    return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 1 ${end.x} ${end.y} Z`;
+  }
+
+  function radialLinePath(cx,cy,r,deg){
+    const p = polar(cx,cy,r,deg);
+    return `M ${cx} ${cy} L ${p.x} ${p.y}`;
+  }
+
+  function renderCircleModel(den, filled, label='fraction circle'){
+    const wrap = document.createElement('div');
+    wrap.className = 'circleModel';
+    const svg = createSvgEl('svg', { viewBox:'0 0 100 100', role:'img', 'aria-label':label });
+
+    for(let i=0;i<den;i++){
+      const start = (360/den)*i;
+      const end = (360/den)*(i+1);
+      svg.appendChild(createSvgEl('path', {
+        d: sectorPath(50,50,46,start,end),
+        fill: i < filled ? 'var(--fill)' : 'var(--empty)'
+      }));
+    }
+
+    for(let i=0;i<den;i++){
+      svg.appendChild(createSvgEl('path', {
+        d: radialLinePath(50,50,46,(360/den)*i),
+        stroke:'var(--ink)',
+        'stroke-width': Math.max(.8, 2.2 - den*0.04),
+        fill:'none'
+      }));
+    }
+
+    svg.appendChild(createSvgEl('circle', {
+      cx:50, cy:50, r:46,
+      fill:'none', stroke:'var(--ink)', 'stroke-width':2.8
+    }));
+
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
+  function renderBarModel(den, filled, label='fraction bar'){
+    const wrap = document.createElement('div');
+    wrap.className = 'barModel';
+    const svg = createSvgEl('svg', { viewBox:'0 0 100 20', preserveAspectRatio:'none', role:'img', 'aria-label':label });
+
+    for(let i=0;i<den;i++){
+      const x = (100/den)*i;
+      const w = 100/den;
+      svg.appendChild(createSvgEl('rect', {
+        x, y:0, width:w, height:20,
+        fill: i < filled ? 'var(--fill)' : 'var(--empty)'
+      }));
+    }
+
+    for(let i=1;i<den;i++){
+      const x = (100/den)*i;
+      svg.appendChild(createSvgEl('line', {
+        x1:x, y1:0, x2:x, y2:20,
+        stroke:'var(--ink)', 'stroke-width': Math.max(.25, 1.6 - den*0.02)
+      }));
+    }
+
+    svg.appendChild(createSvgEl('rect', {
+      x:0, y:0, width:100, height:20,
+      fill:'none', stroke:'var(--ink)', 'stroke-width':1.8
+    }));
+
+    wrap.appendChild(svg);
+    return wrap;
+  }
+
+  function renderVisual(){
+    visualArea.innerHTML = '';
+
+    const n = state.num;
+    const d = state.den;
+    const modelCount = Math.max(1, Math.ceil(n / d));
+    let remaining = n;
+
+    for(let i=0;i<modelCount;i++){
+      const filled = Math.min(d, remaining);
+      remaining -= filled;
+      if(viewMode === 'circle'){
+        visualArea.appendChild(renderCircleModel(d, filled, `circle ${i+1} showing ${filled} out of ${d}`));
+      } else {
+        visualArea.appendChild(renderBarModel(d, filled, `bar ${i+1} showing ${filled} out of ${d}`));
+      }
+    }
+  }
+
+  function renderAll(){
+    fracNumEl.textContent = state.num;
+    fracDenEl.textContent = state.den;
+    modeCaption.textContent = viewMode === 'circle' ? 'Circle slices' : 'Fraction bars';
+    renderVisual();
+  }
+
+  function multiplyBy(k){
+    history.push(snapshot());
+    state.num *= k;
+    state.den *= k;
+    renderAll();
+    bump();
+    showToast(`× ${k}/${k}`);
+  }
+
+  function divideBy(k){
+    if(state.num % k !== 0 || state.den % k !== 0){
+      bump(true);
+      showToast(`Not divisible by ${k}`, true);
+      return;
+    }
+    history.push(snapshot());
+    state.num /= k;
+    state.den /= k;
+    renderAll();
+    bump();
+    showToast(`÷ ${k}`);
+  }
+
+  function setView(mode){
+    if(viewMode === mode) return;
+    history.push(snapshot());
+    viewMode = mode;
+    renderAll();
+    showToast(mode === 'circle' ? 'Circle slices' : 'Fraction bars');
+  }
+
+  function toggleView(){
+    setView(viewMode === 'circle' ? 'bars' : 'circle');
+  }
+
+  function reset(){
+    state.num = state.startNum;
+    state.den = state.startDen;
+    history = [];
+    renderAll();
+    showToast('Reset');
+  }
+
+  function undo(){
+    if(!history.length){
+      showToast('Nothing to undo');
+      return;
+    }
+    restore(history.pop());
+    showToast('Undo');
+  }
+
+  function begin(){
+    const f = parseFraction(fractionInput.value);
+    fractionInput.style.borderColor = 'var(--ink)';
+
+    if(!f){
+      fractionInput.style.borderColor = 'var(--error)';
+      fractionInput.focus();
+      fractionInput.select();
+      return;
+    }
+
+    state = newFraction(f.n, f.d);
+    viewMode = modeInput.value;
+    history = [];
+    startOverlay.style.display = 'none';
+    renderAll();
+  }
+
+  [fractionInput, modeInput].forEach(el => {
+    el.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        e.stopPropagation();
+        begin();
+      }
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    if(e.target && ['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) return;
+    if(startOverlay.style.display !== 'none') return;
+
+    if(helpOverlay.style.display === 'flex'){
+      if(e.key === 'Escape' || e.key === '?' || (e.shiftKey && e.code === 'Slash')){
+        e.preventDefault();
+        helpOverlay.style.display = 'none';
+      }
+      return;
+    }
+
+    const m = e.code.match(/^Digit([2-9])$/);
+    if(m){
+      e.preventDefault();
+      const k = Number(m[1]);
+      if(e.shiftKey) divideBy(k);
+      else multiplyBy(k);
+      return;
+    }
+
+    if(e.key === '?' || (e.shiftKey && e.code === 'Slash')){
+      e.preventDefault();
+      helpOverlay.style.display = 'flex';
+      return;
+    }
+
+    switch(e.key.toLowerCase()){
+      case 'z':
+        e.preventDefault();
+        undo();
+        break;
+      case 'r':
+        e.preventDefault();
+        reset();
+        break;
+      case 'f':
+        e.preventDefault();
+        fractionInput.value = `${state.startNum}/${state.startDen}`;
+        modeInput.value = viewMode;
+        startOverlay.style.display = 'flex';
+        setTimeout(() => fractionInput.focus(), 0);
+        break;
+      case 'v':
+        e.preventDefault();
+        toggleView();
+        break;
+      case 'c':
+        e.preventDefault();
+        setView('circle');
+        break;
+      case 'b':
+        e.preventDefault();
+        setView('bars');
+        break;
+    }
+  });
+
+  renderAll();
+  setTimeout(() => {
+    fractionInput.focus();
+    fractionInput.select();
+  }, 50);
+})();
+</script>
+</body>
+</html>
